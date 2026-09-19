@@ -58,6 +58,7 @@ body{font-family:'Sarabun',sans-serif;background:var(--cream);color:var(--text);
 .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:500;}
 .badge-wait{background:var(--amber-light);color:var(--amber);}
 .badge-done{background:var(--green-light);color:var(--green);}
+.badge-cook{background:#e3f0ff;color:#1a5fb4;}
 .badge-cancel{background:var(--red-light);color:var(--red);}
 
 /* TABLE */
@@ -294,6 +295,31 @@ async function fetchScript(params) {
   } catch(e) { return null; }
 }
 
+// ── วันเวลา (แปลงฝั่งเบราว์เซอร์ ใช้ได้ไม่ว่า Apps Script จะส่งรูปแบบไหนมา) ──
+function parseOrderDate(v) {
+  if (!v) return null;
+  let m = String(v).match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
+  if (m) return { y: m[3], mo: m[2], d: m[1], h: m[4], mi: m[5] };
+  const dt = new Date(v);
+  if (isNaN(dt)) return null;
+  const p = {};
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(dt).forEach(x => p[x.type] = x.value);
+  return { y: p.year, mo: p.month, d: p.day, h: p.hour, mi: p.minute };
+}
+function fmtOrderDate(v) {
+  const p = parseOrderDate(v);
+  return p ? `${p.d}/${p.mo}/${p.y} ${p.h}:${p.mi}` : (v || '-');
+}
+function isTodayBKK(v) {
+  const p = parseOrderDate(v);
+  if (!p) return false;
+  const t = {};
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date()).forEach(x => t[x.type] = x.value);
+  return p.y === t.year && p.mo === t.month && p.d === t.day;
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────
 async function loadDashboard() {
   document.getElementById('dash-spin').style.display = 'inline-block';
@@ -308,7 +334,12 @@ async function loadDashboard() {
   document.getElementById('stat-pending').textContent = data.pending || 0;
   document.getElementById('stat-total').textContent = data.total_orders || 0;
   const orders = await fetchScript({ action: 'orders' });
-  if (orders && orders.orders) renderOrdersTable(orders.orders.slice(0,10), 'dash-orders-wrap', true);
+  if (orders && orders.orders) {
+    const todays = orders.orders.filter(o => isTodayBKK(o['วันเวลา']) && o['สถานะ'] !== 'ยกเลิก');
+    document.getElementById('stat-today').textContent = todays.length;
+    document.getElementById('stat-revenue').textContent = todays.reduce((s, o) => s + (Number(o['ราคารวม']) || 0), 0).toLocaleString();
+    renderOrdersTable(orders.orders.slice(0,10), 'dash-orders-wrap', true);
+  }
 }
 
 // ── ORDERS ────────────────────────────────────────────────
@@ -327,14 +358,14 @@ function renderOrdersTable(orders, wrapId, compact) {
   html += '</tr></thead><tbody>';
   orders.forEach((o, i) => {
     const status = o['สถานะ'] || 'รอดำเนินการ';
-    const badge = status === 'เสร็จสิ้น' ? 'badge-done' : status === 'ยกเลิก' ? 'badge-cancel' : 'badge-wait';
+    const badge = status === 'เสร็จสิ้น' ? 'badge-done' : status === 'ยกเลิก' ? 'badge-cancel' : status === 'กำลังปรุง' ? 'badge-cook' : 'badge-wait';
     html += `<tr>
-      <td style="font-size:12px;color:#666">${o['วันเวลา']||'-'}</td>
+      <td style="font-size:12px;color:#666">${fmtOrderDate(o['วันเวลา'])}</td>
       <td>${o['ชื่อผู้สั่ง']||'-'}<br/><span style="font-size:12px;color:#999">${o['โทร']||''}</span></td>
       <td style="max-width:200px;font-size:13px">${o['เมนู']||'-'}</td>
       <td><strong>${(Number(o['ราคารวม'])||0).toLocaleString()}</strong> บ.</td>
       <td><span class="badge ${badge}">${status}</span></td>`;
-    if (!compact) html += `<td><select class="status-sel" onchange="updateStatus(${i},'${o['วันเวลา']}',this.value)">
+    if (!compact) html += `<td><select class="status-sel" data-time="${o['วันเวลา']||''}" data-phone="${o['โทร']||''}" onchange="updateStatus(${o._row},this)">
         <option ${status==='รอดำเนินการ'?'selected':''}>รอดำเนินการ</option>
         <option ${status==='กำลังปรุง'?'selected':''}>กำลังปรุง</option>
         <option ${status==='เสร็จสิ้น'?'selected':''}>เสร็จสิ้น</option>
@@ -344,6 +375,21 @@ function renderOrdersTable(orders, wrapId, compact) {
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+async function updateStatus(row, sel) {
+  const status = sel.value;
+  sel.disabled = true;
+  const res = await fetchScript({ action: 'updateStatus', row: row, status: status, time: sel.dataset.time, phone: sel.dataset.phone });
+  sel.disabled = false;
+  if (res && res.success) {
+    const badge = sel.closest('tr').querySelector('.badge');
+    badge.textContent = status;
+    badge.className = 'badge ' + (status === 'เสร็จสิ้น' ? 'badge-done' : status === 'ยกเลิก' ? 'badge-cancel' : status === 'กำลังปรุง' ? 'badge-cook' : 'badge-wait');
+  } else {
+    alert('อัปเดตสถานะไม่สำเร็จ' + (res && res.error ? ': ' + res.error : ' — ตรวจสอบว่า deploy Apps Script เวอร์ชันใหม่แล้ว'));
+    loadOrders();
+  }
 }
 
 // ── SURVEYS ───────────────────────────────────────────────
