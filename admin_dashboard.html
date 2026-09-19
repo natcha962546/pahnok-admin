@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Admin — ร้านอาหารตามสั่งป้าโหนก</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&family=Sarabun:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --black:#1a1a1a;--white:#fff;--cream:#f8f4f0;--border:#e8e0d8;
+  --green:#2d6a4f;--green-light:#d8f3dc;
+  --amber:#e76f00;--amber-light:#fff3e0;
+  --red:#c0392b;--red-light:#fde8e8;
+  --blue:#1565c0;--blue-light:#e3f2fd;
+  --text:#1a1a1a;--text2:#666;--radius:8px;
+}
+body{font-family:'Sarabun',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--black);}
+.login-box{background:var(--white);padding:48px 40px;border-radius:12px;width:360px;text-align:center;}
+.login-logo{font-family:'Prompt',sans-serif;font-size:20px;font-weight:600;margin-bottom:4px;}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:32px;}
+.login-box input{width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:15px;font-family:'Sarabun',sans-serif;margin-bottom:12px;outline:none;transition:.2s;}
+.login-box input:focus{border-color:var(--black);}
+.login-btn{width:100%;padding:13px;background:var(--black);color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-family:'Sarabun',sans-serif;cursor:pointer;transition:.2s;}
+.login-btn:hover{background:#333;}
+.login-err{color:var(--red);font-size:13px;margin-top:8px;display:none;}
+
+/* LAYOUT */
+#app{display:none;}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--black);color:#fff;display:flex;flex-direction:column;}
+.sidebar-logo{padding:24px 20px 16px;border-bottom:1px solid #333;}
+.sidebar-logo .s-title{font-family:'Prompt',sans-serif;font-size:15px;font-weight:500;}
+.sidebar-logo .s-sub{font-size:11px;color:#888;margin-top:2px;}
+.nav{padding:16px 0;flex:1;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;cursor:pointer;font-size:14px;color:#aaa;transition:.15s;border-left:3px solid transparent;}
+.nav-item:hover{color:#fff;background:rgba(255,255,255,.06);}
+.nav-item.active{color:#fff;border-left-color:#fff;background:rgba(255,255,255,.08);}
+.nav-item svg{flex-shrink:0;}
+.sidebar-bottom{padding:16px 20px;border-top:1px solid #333;}
+.logout-btn{font-size:13px;color:#888;cursor:pointer;background:none;border:none;font-family:'Sarabun',sans-serif;}
+.logout-btn:hover{color:#fff;}
+
+.main{margin-left:220px;padding:32px;}
+.page{display:none;}
+.page.active{display:block;}
+.page-title{font-family:'Prompt',sans-serif;font-size:22px;font-weight:500;margin-bottom:24px;}
+
+/* CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px;}
+.stat-card{background:#fff;border-radius:10px;padding:20px 24px;border:1px solid var(--border);}
+.stat-label{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.stat-value{font-family:'Prompt',sans-serif;font-size:28px;font-weight:500;}
+.stat-sub{font-size:12px;color:var(--text2);margin-top:4px;}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:500;}
+.badge-wait{background:var(--amber-light);color:var(--amber);}
+.badge-done{background:var(--green-light);color:var(--green);}
+.badge-cancel{background:var(--red-light);color:var(--red);}
+
+/* TABLE */
+.card{background:#fff;border-radius:10px;border:1px solid var(--border);overflow:hidden;margin-bottom:20px;}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-family:'Prompt',sans-serif;font-size:15px;font-weight:500;}
+.refresh-btn{padding:6px 14px;background:var(--cream);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;}
+.refresh-btn:hover{background:var(--border);}
+table{width:100%;border-collapse:collapse;}
+th{padding:10px 16px;text-align:left;font-size:12px;color:var(--text2);background:var(--cream);font-weight:500;border-bottom:1px solid var(--border);}
+td{padding:12px 16px;font-size:14px;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#fafafa;}
+.status-sel{border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;font-family:'Sarabun',sans-serif;background:#fff;cursor:pointer;}
+
+/* CHART */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.chart-box{background:#fff;border-radius:10px;border:1px solid var(--border);padding:20px;}
+.chart-title{font-family:'Prompt',sans-serif;font-size:14px;font-weight:500;margin-bottom:16px;}
+.survey-score{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.score-label{font-size:13px;width:160px;flex-shrink:0;}
+.score-bar-wrap{flex:1;background:var(--cream);border-radius:4px;height:8px;}
+.score-bar{height:8px;border-radius:4px;background:var(--black);transition:.6s;}
+.score-val{font-size:13px;font-weight:500;width:32px;text-align:right;}
+
+/* SETTINGS */
+.settings-section{background:#fff;border-radius:10px;border:1px solid var(--border);padding:24px;margin-bottom:16px;}
+.settings-title{font-family:'Prompt',sans-serif;font-size:15px;font-weight:500;margin-bottom:16px;}
+.field-row{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.field-row label{font-size:13px;color:var(--text2);}
+.field-row input,.field-row textarea{padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;transition:.2s;}
+.field-row input:focus,.field-row textarea:focus{border-color:var(--black);}
+.save-btn{padding:10px 24px;background:var(--black);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-family:'Sarabun',sans-serif;cursor:pointer;}
+
+/* EMPTY */
+.empty-state{padding:40px;text-align:center;color:var(--text2);font-size:14px;}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--black);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.script-url-note{font-size:12px;color:var(--text2);margin-top:6px;}
+
+@media(max-width:768px){
+  .sidebar{width:100%;height:60px;flex-direction:row;bottom:auto;}
+  .main{margin-left:0;margin-top:60px;padding:16px;}
+  .chart-grid{grid-template-columns:1fr;}
+  .stat-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">ร้านอาหารตามสั่งป้าโหนก</div>
+    <div class="login-sub">ระบบจัดการหลังบ้าน</div>
+    <input type="text" id="user-in" placeholder="ชื่อผู้ใช้" autocomplete="username"/>
+    <input type="password" id="pass-in" placeholder="รหัสผ่าน" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <button class="login-btn" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div class="login-err" id="login-err">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</div>
+    <div style="margin-top:16px;font-size:12px;color:#999;">admin / pahnok2569</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="s-title">ป้าโหนก Admin</div>
+      <div class="s-sub">จัดการร้านอาหาร</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="showPage('dashboard',this)">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        ภาพรวม
+      </div>
+      <div class="nav-item" onclick="showPage('orders',this)">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+        รายการสั่งซื้อ
+      </div>
+      <div class="nav-item" onclick="showPage('surveys',this)">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        แบบประเมิน
+      </div>
+      <div class="nav-item" onclick="showPage('settings',this)">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        ตั้งค่า
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="doLogout()">ออกจากระบบ</button>
+    </div>
+  </div>
+
+  <main class="main">
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">ภาพรวมวันนี้</div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">ออเดอร์วันนี้</div>
+          <div class="stat-value" id="stat-today">—</div>
+          <div class="stat-sub">รายการ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ยอดขายวันนี้</div>
+          <div class="stat-value" id="stat-revenue">—</div>
+          <div class="stat-sub">บาท</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">รอดำเนินการ</div>
+          <div class="stat-value" id="stat-pending">—</div>
+          <div class="stat-sub">รายการ</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">ออเดอร์ทั้งหมด</div>
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-sub">รายการ</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">ออเดอร์ล่าสุด</div>
+          <button class="refresh-btn" onclick="loadDashboard()"><span class="spinner" id="dash-spin" style="display:none"></span>รีเฟรช</button>
+        </div>
+        <div id="dash-orders-wrap">
+          <div class="empty-state">กด "รีเฟรช" หรือตั้งค่า Script URL ก่อนครับ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="page" id="page-orders">
+      <div class="page-title">รายการสั่งซื้อ</div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">ออเดอร์ทั้งหมด (50 รายการล่าสุด)</div>
+          <button class="refresh-btn" onclick="loadOrders()">รีเฟรช</button>
+        </div>
+        <div id="orders-wrap"><div class="empty-state">กด "รีเฟรช" เพื่อโหลดข้อมูล</div></div>
+      </div>
+    </div>
+
+    <!-- SURVEYS -->
+    <div class="page" id="page-surveys">
+      <div class="page-title">แบบประเมินความพึงพอใจ</div>
+      <div class="chart-grid">
+        <div class="chart-box">
+          <div class="chart-title">คะแนนเฉลี่ยรายด้าน</div>
+          <div id="survey-bars"><div class="empty-state">กด "โหลดข้อมูล" ด้านล่าง</div></div>
+        </div>
+        <div class="chart-box">
+          <div class="chart-title">แผนภูมิคะแนน</div>
+          <canvas id="survey-chart" height="200"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">ความคิดเห็นล่าสุด</div>
+          <button class="refresh-btn" onclick="loadSurveys()">โหลดข้อมูล</button>
+        </div>
+        <div id="surveys-wrap"><div class="empty-state">กด "โหลดข้อมูล"</div></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div class="page-title">ตั้งค่า</div>
+      <div class="settings-section">
+        <div class="settings-title">เชื่อมต่อ Google Apps Script</div>
+        <div class="field-row">
+          <label>Script URL (Web App URL จาก Deploy)</label>
+          <input type="url" id="script-url" placeholder="https://script.google.com/macros/s/xxx/exec"/>
+          <div class="script-url-note">นำ URL จาก Apps Script → Deploy → Web App มาใส่ที่นี่</div>
+        </div>
+        <button class="save-btn" onclick="saveSettings()">บันทึกและทดสอบ</button>
+        <span id="test-result" style="margin-left:12px;font-size:13px;"></span>
+      </div>
+      <div class="settings-section">
+        <div class="settings-title">ข้อมูลร้าน (แสดงใน Dashboard)</div>
+        <div class="field-row">
+          <label>ชื่อร้าน</label>
+          <input type="text" id="cfg-name" value="ร้านอาหารตามสั่งป้าโหนก"/>
+        </div>
+        <div class="field-row">
+          <label>เวลาทำการ</label>
+          <input type="text" id="cfg-hours" value="10:00 – 22:00 น. ทุกวัน"/>
+        </div>
+        <button class="save-btn" onclick="saveConfig()">บันทึก</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'pahnok2569';
+let SCRIPT_URL = localStorage.getItem('script_url') || '';
+let surveyChart = null;
+
+// ── LOGIN ─────────────────────────────────────────────────
+function doLogin() {
+  const u = document.getElementById('user-in').value.trim();
+  const p = document.getElementById('pass-in').value.trim();
+  if (u === ADMIN_USER && p === ADMIN_PASS) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('script-url').value = SCRIPT_URL;
+    loadDashboard();
+  } else {
+    document.getElementById('login-err').style.display = 'block';
+  }
+}
+function doLogout() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+// ── NAV ───────────────────────────────────────────────────
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── API ───────────────────────────────────────────────────
+async function fetchScript(params) {
+  if (!SCRIPT_URL) return null;
+  try {
+    const url = SCRIPT_URL + '?' + new URLSearchParams(params);
+    const res = await fetch(url);
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────
+async function loadDashboard() {
+  document.getElementById('dash-spin').style.display = 'inline-block';
+  const data = await fetchScript({ action: 'summary' });
+  document.getElementById('dash-spin').style.display = 'none';
+  if (!data) {
+    document.getElementById('dash-orders-wrap').innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อได้ — กรุณาตั้งค่า Script URL ก่อน</div>';
+    return;
+  }
+  document.getElementById('stat-today').textContent = data.today_orders || 0;
+  document.getElementById('stat-revenue').textContent = (data.today_revenue || 0).toLocaleString();
+  document.getElementById('stat-pending').textContent = data.pending || 0;
+  document.getElementById('stat-total').textContent = data.total_orders || 0;
+  const orders = await fetchScript({ action: 'orders' });
+  if (orders && orders.orders) renderOrdersTable(orders.orders.slice(0,10), 'dash-orders-wrap', true);
+}
+
+// ── ORDERS ────────────────────────────────────────────────
+async function loadOrders() {
+  document.getElementById('orders-wrap').innerHTML = '<div class="empty-state"><span class="spinner"></span>กำลังโหลด...</div>';
+  const data = await fetchScript({ action: 'orders' });
+  if (!data) { document.getElementById('orders-wrap').innerHTML = '<div class="empty-state">เชื่อมต่อไม่ได้</div>'; return; }
+  renderOrdersTable(data.orders, 'orders-wrap', false);
+}
+
+function renderOrdersTable(orders, wrapId, compact) {
+  const wrap = document.getElementById(wrapId);
+  if (!orders || !orders.length) { wrap.innerHTML = '<div class="empty-state">ยังไม่มีออเดอร์</div>'; return; }
+  let html = '<table><thead><tr><th>วันเวลา</th><th>ชื่อ</th><th>เมนู</th><th>ยอด</th><th>สถานะ</th>';
+  if (!compact) html += '<th>อัปเดต</th>';
+  html += '</tr></thead><tbody>';
+  orders.forEach((o, i) => {
+    const status = o['สถานะ'] || 'รอดำเนินการ';
+    const badge = status === 'เสร็จสิ้น' ? 'badge-done' : status === 'ยกเลิก' ? 'badge-cancel' : 'badge-wait';
+    html += `<tr>
+      <td style="font-size:12px;color:#666">${o['วันเวลา']||'-'}</td>
+      <td>${o['ชื่อผู้สั่ง']||'-'}<br/><span style="font-size:12px;color:#999">${o['โทร']||''}</span></td>
+      <td style="max-width:200px;font-size:13px">${o['เมนู']||'-'}</td>
+      <td><strong>${(Number(o['ราคารวม'])||0).toLocaleString()}</strong> บ.</td>
+      <td><span class="badge ${badge}">${status}</span></td>`;
+    if (!compact) html += `<td><select class="status-sel" onchange="updateStatus(${i},'${o['วันเวลา']}',this.value)">
+        <option ${status==='รอดำเนินการ'?'selected':''}>รอดำเนินการ</option>
+        <option ${status==='กำลังปรุง'?'selected':''}>กำลังปรุง</option>
+        <option ${status==='เสร็จสิ้น'?'selected':''}>เสร็จสิ้น</option>
+        <option ${status==='ยกเลิก'?'selected':''}>ยกเลิก</option>
+      </select></td>`;
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+// ── SURVEYS ───────────────────────────────────────────────
+async function loadSurveys() {
+  document.getElementById('surveys-wrap').innerHTML = '<div class="empty-state"><span class="spinner"></span>กำลังโหลด...</div>';
+  const data = await fetchScript({ action: 'surveys' });
+  if (!data) { document.getElementById('surveys-wrap').innerHTML = '<div class="empty-state">เชื่อมต่อไม่ได้</div>'; return; }
+
+  // Bars
+  const avgs = data.averages || {};
+  const keys = Object.keys(avgs);
+  let barsHTML = '';
+  keys.forEach(k => {
+    const v = parseFloat(avgs[k]);
+    const pct = (v / 5 * 100).toFixed(0);
+    barsHTML += `<div class="survey-score">
+      <div class="score-label">${k}</div>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:${pct}%"></div></div>
+      <div class="score-val">${v}</div>
+    </div>`;
+  });
+  document.getElementById('survey-bars').innerHTML = barsHTML || '<div class="empty-state">ยังไม่มีข้อมูล</div>';
+
+  // Chart
+  if (keys.length) {
+    if (surveyChart) surveyChart.destroy();
+    const ctx = document.getElementById('survey-chart').getContext('2d');
+    surveyChart = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: keys.map(k => k.length > 6 ? k.slice(0,6)+'…' : k),
+        datasets: [{ label: 'คะแนนเฉลี่ย', data: keys.map(k => avgs[k]),
+          backgroundColor: 'rgba(26,26,26,.1)', borderColor: '#1a1a1a',
+          pointBackgroundColor: '#1a1a1a', pointRadius: 4 }]
+      },
+      options: { scales: { r: { min: 0, max: 5, ticks: { stepSize: 1, font: { size: 10 } } } },
+        plugins: { legend: { display: false } } }
+    });
+  }
+
+  // Comments
+  if (data.surveys && data.surveys.length) {
+    let html = '<table><thead><tr><th>วันเวลา</th><th>คะแนนรวม</th><th>ความคิดเห็น</th></tr></thead><tbody>';
+    data.surveys.forEach(s => {
+      html += `<tr><td style="font-size:12px;color:#666">${s.date}</td><td><strong>${s.overall}</strong>/5</td><td>${s.comment||'-'}</td></tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('surveys-wrap').innerHTML = html;
+  } else {
+    document.getElementById('surveys-wrap').innerHTML = '<div class="empty-state">ยังไม่มีความคิดเห็น</div>';
+  }
+}
+
+// ── SETTINGS ─────────────────────────────────────────────
+async function saveSettings() {
+  const url = document.getElementById('script-url').value.trim();
+  SCRIPT_URL = url;
+  localStorage.setItem('script_url', url);
+  const result = document.getElementById('test-result');
+  result.textContent = 'กำลังทดสอบ...';
+  const data = await fetchScript({ action: 'summary' });
+  if (data) {
+    result.style.color = 'green';
+    result.textContent = '✓ เชื่อมต่อสำเร็จ!';
+    loadDashboard();
+  } else {
+    result.style.color = 'red';
+    result.textContent = '✗ เชื่อมต่อไม่ได้ ตรวจสอบ URL อีกครั้ง';
+  }
+}
+function saveConfig() {
+  localStorage.setItem('cfg_name', document.getElementById('cfg-name').value);
+  localStorage.setItem('cfg_hours', document.getElementById('cfg-hours').value);
+  alert('บันทึกแล้วครับ');
+}
+</script>
+</body>
+</html>
