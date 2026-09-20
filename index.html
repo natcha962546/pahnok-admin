@@ -276,7 +276,7 @@ function doLogin() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('script-url').value = SCRIPT_URL;
-    loadDashboard();
+    loadDashboard().then(() => { fetchScript({ action: 'surveys' }); });
   } else {
     document.getElementById('login-err').style.display = 'block';
   }
@@ -304,8 +304,16 @@ async function fetchScript(params) {
   try {
     const url = SCRIPT_URL + '?' + new URLSearchParams(params);
     const res = await fetch(url);
-    return await res.json();
+    const json = await res.json();
+    if (params.action && params.action !== 'updateStatus') {
+      try { localStorage.setItem('pk_cache_' + params.action, JSON.stringify(json)); } catch (e) {}
+    }
+    return json;
   } catch(e) { return null; }
+}
+// อ่านข้อมูลล่าสุดที่เก็บไว้ในเครื่อง เพื่อโชว์ทันทีระหว่างรอข้อมูลใหม่
+function readCache(action) {
+  try { return JSON.parse(localStorage.getItem('pk_cache_' + action)); } catch (e) { return null; }
 }
 
 // ── วันเวลา (แปลงฝั่งเบราว์เซอร์ ใช้ได้ไม่ว่า Apps Script จะส่งรูปแบบไหนมา) ──
@@ -334,32 +342,45 @@ function isTodayBKK(v) {
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
-async function loadDashboard() {
-  document.getElementById('dash-spin').style.display = 'inline-block';
-  const data = await fetchScript({ action: 'summary' });
-  document.getElementById('dash-spin').style.display = 'none';
-  if (!data) {
-    document.getElementById('dash-orders-wrap').innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อได้ — กรุณาตั้งค่า Script URL ก่อน</div>';
-    return;
+function applyDashboard(summary, orders) {
+  if (summary) {
+    document.getElementById('stat-pending').textContent = summary.pending || 0;
+    document.getElementById('stat-total').textContent = summary.total_orders || 0;
   }
-  document.getElementById('stat-today').textContent = data.today_orders || 0;
-  document.getElementById('stat-revenue').textContent = (data.today_revenue || 0).toLocaleString();
-  document.getElementById('stat-pending').textContent = data.pending || 0;
-  document.getElementById('stat-total').textContent = data.total_orders || 0;
-  const orders = await fetchScript({ action: 'orders' });
-  if (orders && orders.orders) {
-    const todays = orders.orders.filter(o => isTodayBKK(o['วันเวลา']) && o['สถานะ'] !== 'ยกเลิก');
+  if (orders) {
+    const todays = orders.filter(o => isTodayBKK(o['วันเวลา']) && o['สถานะ'] !== 'ยกเลิก');
     document.getElementById('stat-today').textContent = todays.length;
     document.getElementById('stat-revenue').textContent = todays.reduce((s, o) => s + (Number(o['ราคารวม']) || 0), 0).toLocaleString();
-    renderOrdersTable(orders.orders.slice(0,10), 'dash-orders-wrap', true);
+    renderOrdersTable(orders.slice(0, 10), 'dash-orders-wrap', true);
   }
+}
+async function loadDashboard() {
+  // 1) โชว์ข้อมูลล่าสุดที่เคยโหลดไว้ทันที
+  const c = readCache('dashboard');
+  if (c && c.orders) applyDashboard(c.summary, c.orders);
+  document.getElementById('dash-spin').style.display = 'inline-block';
+  // 2) ขอข้อมูลใหม่ (คำขอเดียวได้ทั้งสถิติและออเดอร์)
+  let data = await fetchScript({ action: 'dashboard' });
+  if (!data || !data.orders) {
+    // Apps Script เวอร์ชันเก่ายังไม่มี action นี้ → ขอ 2 อย่างพร้อมกัน
+    const [sum, ord] = await Promise.all([fetchScript({ action: 'summary' }), fetchScript({ action: 'orders' })]);
+    data = sum ? { summary: sum, orders: ord && ord.orders } : null;
+  }
+  document.getElementById('dash-spin').style.display = 'none';
+  if (!data) {
+    if (!c) document.getElementById('dash-orders-wrap').innerHTML = '<div class="empty-state">เชื่อมต่อไม่ได้ — ตรวจสอบ Script URL ในตั้งค่า</div>';
+    return;
+  }
+  applyDashboard(data.summary, data.orders);
 }
 
 // ── ORDERS ────────────────────────────────────────────────
 async function loadOrders() {
-  document.getElementById('orders-wrap').innerHTML = '<div class="empty-state"><span class="spinner"></span>กำลังโหลด...</div>';
+  const c = readCache('orders');
+  if (c && c.orders) renderOrdersTable(c.orders, 'orders-wrap', false);
+  else document.getElementById('orders-wrap').innerHTML = '<div class="empty-state"><span class="spinner"></span>กำลังโหลด...</div>';
   const data = await fetchScript({ action: 'orders' });
-  if (!data) { document.getElementById('orders-wrap').innerHTML = '<div class="empty-state">เชื่อมต่อไม่ได้</div>'; return; }
+  if (!data) { if (!c) document.getElementById('orders-wrap').innerHTML = '<div class="empty-state">เชื่อมต่อไม่ได้</div>'; return; }
   renderOrdersTable(data.orders, 'orders-wrap', false);
 }
 
@@ -407,9 +428,14 @@ async function updateStatus(row, sel) {
 
 // ── SURVEYS ───────────────────────────────────────────────
 async function loadSurveys(silent) {
-  if (!silent) document.getElementById('surveys-wrap').innerHTML = '<div class="empty-state"><span class="spinner"></span>กำลังโหลด...</div>';
+  const c = readCache('surveys');
+  if (!silent && c) renderSurveys(c);
+  else if (!silent) document.getElementById('surveys-wrap').innerHTML = '<div class="empty-state"><span class="spinner"></span>กำลังโหลด...</div>';
   const data = await fetchScript({ action: 'surveys' });
-  if (!data) { document.getElementById('surveys-wrap').innerHTML = '<div class="empty-state">เชื่อมต่อไม่ได้</div>'; return; }
+  if (!data) { if (!c) document.getElementById('surveys-wrap').innerHTML = '<div class="empty-state">เชื่อมต่อไม่ได้</div>'; return; }
+  renderSurveys(data);
+}
+function renderSurveys(data) {
 
   // Bars
   const avgs = data.averages || {};
