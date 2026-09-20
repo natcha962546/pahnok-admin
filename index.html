@@ -216,7 +216,7 @@ tr:hover td{background:#fafafa;}
       <div class="chart-grid">
         <div class="chart-box">
           <div class="chart-title">คะแนนเฉลี่ยรายด้าน</div>
-          <div id="survey-bars"><div class="empty-state">กด "โหลดข้อมูล" ด้านล่าง</div></div>
+          <div id="survey-bars"><div class="empty-state">กำลังโหลดข้อมูล...</div></div>
         </div>
         <div class="chart-box">
           <div class="chart-title">แผนภูมิคะแนน</div>
@@ -228,7 +228,7 @@ tr:hover td{background:#fafafa;}
           <div class="card-title">ความคิดเห็นล่าสุด</div>
           <button class="refresh-btn" onclick="loadSurveys()">โหลดข้อมูล</button>
         </div>
-        <div id="surveys-wrap"><div class="empty-state">กด "โหลดข้อมูล"</div></div>
+        <div id="surveys-wrap"><div class="empty-state">กำลังโหลดข้อมูล...</div></div>
       </div>
     </div>
 
@@ -292,6 +292,10 @@ function showPage(id, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   el.classList.add('active');
+  // เข้าหน้าไหนก็โหลดข้อมูลให้เลย ไม่ต้องกดปุ่ม
+  if (id === 'dashboard') loadDashboard();
+  else if (id === 'orders') loadOrders();
+  else if (id === 'surveys') loadSurveys();
 }
 
 // ── API ───────────────────────────────────────────────────
@@ -564,7 +568,7 @@ function saveConfig() {
   setInterval(function(){pill.style.display=appVisible()?'flex':'none';poll();},INTERVAL);
   setInterval(function(){pill.style.display=appVisible()?'flex':'none';},1000);
   // เปลี่ยนหน้าแล้วอัปเดตทันที
-  document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('.nav-item')){sigDash='';sigOrders='';setTimeout(poll,50);}});
+  document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('.nav-item')){sigDash='';sigOrders='';}});
 })();
 </script>
 </body>
